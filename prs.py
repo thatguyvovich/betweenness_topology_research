@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-import matplotlib.pyplot as plt
+
 import numpy as np
 import math
 import argparse
@@ -66,34 +66,6 @@ class FloydWarshallPathfinder(AbstractPathfinder):
         
         self.MD = distance
         self.MN = next
-
-@njit
-def ToDistanceMatrix(MA):
-    """
-    MA - adjacency matrix
-
-    return distance matrix
-    """
-    distance = np.zeros(shape=(len(MA), len(MA)), dtype=np.int64)
-    distance = np.copy(MA)
-    for i in range(len(MA)):
-        for j in range(len(MA)):
-            if distance[i, j] == 0:
-                distance[i, j] = 9000000
-
-    for k in range(len(MA)):
-        for i in range(len(MA)):
-            for j in range(len(MA)):
-                if distance[i, j] > distance[i, k] + distance[k, j]:
-                    distance[i, j] = distance[i, k] + distance[k, j]
-    
-    for i in range(len(MA)):
-        distance[i, i] = 0
-        for j in range(len(MA)):
-            distance[j, i] = distance[i, j]
-
-    return distance
-
 
 def Betweeness(MA):
     betweeness = [np.count_nonzero(MA == i) for i in range(len(MA))]
