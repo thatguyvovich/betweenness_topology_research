@@ -143,11 +143,15 @@ def model_faults(betweenness, topology, fault_rate: float=0.3):
     """
     A function that models the faults in the network
     """
-    for i in range(math.floor(len(betweenness) * fault_rate)):
+    indices = []
+
+    for _ in range(math.floor(len(betweenness) * fault_rate)):
         max_index = betweenness.index(max(betweenness))
+        print("Removing node: ", max_index + len([i for i in indices if i <= max_index]))
+        indices.append(max_index)
         topology = np.delete(topology, max_index, axis=0)
         topology = np.delete(topology, max_index, axis=1) 
-        MA, MN = FloydWarshallPathfinder(topology).find_paths()
+        _, MN = FloydWarshallPathfinder(topology).find_paths()
         betweenness = Betweeness(MN)
         print(betweenness)
 
