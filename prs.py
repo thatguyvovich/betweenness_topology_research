@@ -1,77 +1,49 @@
 # -*- coding: utf-8 -*-
-
-
-import numpy as np
 import math
 import argparse
 from typing import List
 # LLVM compiler
 from numba import njit
+import numpy as np
 
-class AbstractPathfinder:
-    # Adjacency matrix
-    MA: List[List[int]]
-    # Distance matrix
-    MD: List[List[int]]
-    # Next matrix
-    MN: List[List[int]]
-
-    # Method that returns a matrix of paths
-    def find_paths() -> List[List[int]]: ...
-
-    # Internal function that calculates paths
-    def __path_reconstructor(): ...
+from pathfinders.FloydWarshall import FloydWarshallPathfinder
+from pathfinders.FloydWarshallMemory import FloydWarshallMemoryPathfinder
+from pathfinders.AbstractPathfinder import AbstractPathfinder
 
 
-class FloydWarshallPathfinder(AbstractPathfinder):
-
-    def __init__(self, MA: List[List[int]]):
-        self.MA = MA
-
-    def find_paths(self) -> List[List[int]]:
-        self.__path_reconstructor()
-        return self.MD, self.MN
-    
-    def __path_reconstructor(self):
+class PathfinderFactory():
+    """
+    Factory class for pathfinding algorithms
+    """
+    @staticmethod
+    def create_pathfinder(patfinder_type: str, topology: List[List[int]]) -> AbstractPathfinder:
         """
-        Reconstructs the shortest path between two nodes in a graph using Floyd's algorithm
-        :param MA: Adjacency matrix
-        :return: A matrix of the shortest path between two nodes in the graph
+        Factory method that returns an instance of a pathfinding algorithm
+        :return: An instance of a pathfinding algorithm
         """
-        distance = np.zeros(shape=(len(self.MA), len(self.MA)), dtype=np.int64)
-        distance = np.copy(self.MA)
-        next = np.zeros(shape=(len(self.MA), len(self.MA)), dtype=np.int64)
-        for i in range(len(self.MA)):
-            for j in range(len(self.MA)):
-                if distance[i, j] == 0:
-                    distance[i, j] = 9000000
-                elif distance[i, j] == 1:
-                    next[i, j] = j
-                elif i == j:
-                    distance[i, i] = 0
-                    next[i, i] = i
-        
-        for k in range(len(self.MA)):
-            for i in range(len(self.MA)):
-                for j in range(len(self.MA)):
-                    if distance[i, j] > distance[i, k] + distance[k, j]:
-                        distance[i, j] = distance[i, k] + distance[k, j]
-                        next[i][j] = next[i][k]
+        if patfinder_type == "FloydWarshallMemory":
+            return FloydWarshallMemoryPathfinder(topology)
+        elif patfinder_type == "FloydWarshall":
+            return FloydWarshallPathfinder(topology)
+        else:
+            raise Exception("Pathfinder not found")
 
-            
-        for i in range(len(self.MA)):
-            next[i, i] = i
-            for j in range(len(self.MA)):
-                next[j, i] = next[i, j]
-        
-        self.MD = distance
-        self.MN = next
 
 def Betweeness(MA):
+    """
+    A function that calculates the betweeness of a topology
+    :param MA: Adjacency matrix
+    :return: A vector of the betweeness of each node
+    """
     betweeness = [np.count_nonzero(MA == i) for i in range(len(MA))]
     return betweeness
 
 def ToBetweenessVector(MA):
+    """
+    A function that calculates the betweeness of a topology
+    param MA: Adjacency matrix
+    return: A vector of the betweeness of each node
+    """
     distance = np.zeros(shape=(len(MA), len(MA)), dtype=np.int64)
     distance = np.copy(MA)
     betweeness = np.zeros(shape=(len(MA)), dtype=np.int64)
@@ -86,7 +58,7 @@ def ToBetweenessVector(MA):
                 if distance[i, j] > distance[i, k] + distance[k, j]:
                     distance[i, j] = distance[i, k] + distance[k, j]
                     betweeness[k] = betweeness[k] + 1
-    
+
     for i in range(len(MA)):
         distance[i, i] = 0
         for j in range(len(MA)):
@@ -108,7 +80,8 @@ def CopyDiagonalMatrix(MF):
 
 def JavaMatrixToPython(MF: str):
     """
-    A function that takes in a string representation of a matrix as in Jave and returns a python matrix
+    A function that takes in a string representation of a matrix as in Java 
+    and returns a python matrix
     """
     MF = MF.replace("{", "")
     MF = MF.replace("}", "")
@@ -124,7 +97,8 @@ def get_betweenness(topology):
     Returns a list of betwennness coefficients for the example graph
     """
     FWP = FloydWarshallPathfinder(topology)
-    MA, MN = FWP.find_paths()
+    FWM = FloydWarshallMemoryPathfinder(topology)
+    MA, MN = FWM.find_paths()
     print(MN)
     print(Betweeness(MN))
 
@@ -139,7 +113,7 @@ def convert_string_to_matrix(topology: str):
     return topology
 
 
-def model_faults(betweenness, topology, fault_rate: float=0.3):
+def model_faults(betweenness, topology, pathfinder_type: str, fault_rate: float=0.3):
     """
     A function that models the faults in the network
     """
@@ -150,15 +124,16 @@ def model_faults(betweenness, topology, fault_rate: float=0.3):
         print("Removing node: ", max_index + len([i for i in indices if i <= max_index]))
         indices.append(max_index)
         topology = np.delete(topology, max_index, axis=0)
-        topology = np.delete(topology, max_index, axis=1) 
-        _, MN = FloydWarshallPathfinder(topology).find_paths()
+        topology = np.delete(topology, max_index, axis=1)
+        _, MN = PathfinderFactory.create_pathfinder(pathfinder_type, topology).find_paths()
         betweenness = Betweeness(MN)
         print(betweenness)
 
 
 def get_topology_from_input(path: str=None):
     """
-    A function that takes in the path of file and retrieves the topology described as a java array (ex. {{1, 2, 3, 4}, {1, 2, 3, 4}, {1, 2, 3, 4}, {1, 2, 3, 4}})
+    A function that takes in the path of file and retrieves the topology described as a java array 
+    (ex. {{1, 2, 3, 4}, {1, 2, 3, 4}, {1, 2, 3, 4}, {1, 2, 3, 4}})
     """
     if path is None:
         path = input("Enter the path of the file: ")
@@ -173,8 +148,6 @@ def main(args):
     """
     Entry point for tests during development
     """
-    # Example topology remove later
-    #dragon_tree = '{0, 1, 1, 1, 0, 0, 0, 0, 0}, {0, 0, 1, 0, 1, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 1, 0, 0, 0}, {0, 0, 0, 0, 1, 1, 0, 0, 0}, {0, 0, 0, 0, 0, 1, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 1, 1}, {0, 0, 0, 0, 0, 0, 0, 0, 1}, {0, 0, 0, 0, 0, 0, 1, 1, 0}}'
     dragon_tree = get_topology_from_input(args.topology)
     dragon_tree = convert_string_to_matrix(dragon_tree)
 
@@ -183,7 +156,9 @@ def main(args):
     betweeness_results.index(max(betweeness_results))
 
     dragon_tree_new = np.array(dragon_tree)
-    model_faults(betweeness_results, dragon_tree_new, fault_rate=float(args.fault_rate))
+
+    model_faults(betweeness_results, dragon_tree_new, "FloydWarshallMemory",
+                 fault_rate=float(args.fault_rate))
 
 def read_cmd_arguments():
     """
